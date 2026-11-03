@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.annotation.DrawableRes
+import androidx.annotation.RawRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,12 +28,15 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,8 +48,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import tw.edu.pu.csim.s1141244.basicui.ui.theme.BasicUITheme
 
 class MainActivity : ComponentActivity() {
@@ -76,6 +86,7 @@ fun Main(modifier: Modifier = Modifier) {
         ColumnExample(modifier)
         TextFieldExample(modifier)
         LazyRowExample(modifier)
+        SimpleVideoPlayer(R.raw.love, R.raw.handpan)
     }
 }
 
@@ -98,24 +109,24 @@ fun LazyColumnExample(modifier: Modifier = Modifier) {
 
 @Composable
 fun ColumnExample(modifier: Modifier = Modifier) {
-    var msg by remember { mutableStateOf( value = "") }
-    Column (
+    var msg by remember { mutableStateOf(value = "") }
+    Column(
         modifier = modifier
             .fillMaxSize()
             .background(Color(0xffE0BBE4))
-            .pointerInput ( key1 = Unit){
-                detectTapGestures (
-                    onTap = { msg = "短按"},
-                    onDoubleTap = { msg = "連按兩下"},
-                    onLongPress = { msg = "長按"},
+            .pointerInput(key1 = Unit) {
+                detectTapGestures(
+                    onTap = { msg = "短按" },
+                    onDoubleTap = { msg = "連按兩下" },
+                    onLongPress = { msg = "長按" },
                 )
             },
         verticalArrangement = Arrangement.Top,
         horizontalAlignment = Alignment.CenterHorizontally
-    ){
+    ) {
         Text("行動應用軟體開發：基本元件")
         Text("作者：沈禺宏")
-        Text( msg )
+        Text(msg)
 
         Spacer(modifier = Modifier.height(8.dp))
         RowExample(modifier)
@@ -197,20 +208,23 @@ fun LazyRowExample(modifier: Modifier = Modifier) {
     )
 
     LazyRow(
-        modifier = Modifier.fillMaxHeight(),
+        modifier = Modifier
+            .fillMaxHeight()
+            .padding(top = 260.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // 直接傳入 animals 清單，每個迴圈拿到一個 animal 物件
         itemsIndexed(animals) { index, animal ->
 
             Card(
-                modifier = Modifier.fillParentMaxWidth(1.0f)
+                modifier = Modifier
+                    .fillParentMaxWidth(1.0f)
                     .height(260.dp),
                 elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = Color(0xFFD0BCFF)
                 )
-            ){
+            ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
@@ -219,11 +233,12 @@ fun LazyRowExample(modifier: Modifier = Modifier) {
                     Image(
                         painter = painterResource(id = animal.imageRes),
                         contentDescription = animal.name,
-                        modifier = Modifier.size(150.dp)
-                            .clickable{
+                        modifier = Modifier
+                            .size(150.dp)
+                            .clickable {
                                 Toast.makeText(
                                     context,
-                                    "${animal.name}",
+                                    animal.name,
                                     Toast.LENGTH_SHORT
                                 ).show()
                             }
@@ -234,12 +249,51 @@ fun LazyRowExample(modifier: Modifier = Modifier) {
                     )
                 }
             }
-
-
         }
     }
 }
 
 
+@Composable
+fun SimpleVideoPlayer(
+    @RawRes video1: Int,
+    @RawRes video2: Int
+) {
+    val context = LocalContext.current
+    var isFirst by remember { mutableStateOf(true) }
 
+    val exoPlayer = remember {
+        ExoPlayer.Builder(context).build().apply {
+            repeatMode = Player.REPEAT_MODE_ONE
+            playWhenReady = true
+        }
+    }
 
+    LaunchedEffect(isFirst) {
+        val res = if (isFirst) video1 else video2
+        val uri = "android.resource://${context.packageName}/$res"
+        exoPlayer.setMediaItem(MediaItem.fromUri(uri))
+        exoPlayer.prepare()
+        exoPlayer.play()
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { exoPlayer.release() }
+    }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        AndroidView(
+            factory = { ctx -> PlayerView(ctx).apply { player = exoPlayer } },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(200.dp)
+        )
+
+        Button(onClick = { isFirst = !isFirst }) {
+            Text(if (isFirst) "切換至手碟影片" else "切換至Love影片")
+        }
+    }
+}
